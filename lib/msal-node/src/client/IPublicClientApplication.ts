@@ -24,6 +24,9 @@ export interface IPublicClientApplication {
     /** Acquires a token by exchanging the authorization code received from the first step of OAuth 2.0 Authorization Code Flow */
     acquireTokenByCode(request: AuthorizationCodeRequest): Promise<AuthenticationResult | null>;
 
+    /** Acquires a token interactively */
+    acquireTokenInteractive(request: AuthorizationUrlRequest, navigate: (url: string) => Promise<void>): Promise<AuthenticationResult | null>;
+
     /** Acquires a token silently when a user specifies the account the token is requested for */
     acquireTokenSilent(request: SilentFlowRequest): Promise<AuthenticationResult | null>;
 

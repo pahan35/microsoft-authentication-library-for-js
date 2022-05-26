@@ -31,6 +31,7 @@ import {
     AuthorizationCodePayload,
     StringUtils,
     Constants,
+    UrlString,
 } from "@azure/msal-common";
 import { Configuration, buildAppConfiguration, NodeConfiguration } from "../config/Configuration";
 import { CryptoProvider } from "../crypto/CryptoProvider";
@@ -44,6 +45,7 @@ import { RefreshTokenRequest } from "../request/RefreshTokenRequest";
 import { SilentFlowRequest } from "../request/SilentFlowRequest";
 import { version, name } from "../packageMetadata";
 import { UsernamePasswordRequest } from "../request/UsernamePasswordRequest";
+import * as http from "http";
 
 /**
  * Base abstract class for all ClientApplications - public and confidential
@@ -158,6 +160,61 @@ export abstract class ClientApplication {
             serverTelemetryManager.cacheFailedRequest(e);
             throw e;
         }
+    }
+
+    /**
+     * Acquires a token by requesting an Authorization code then exchanging it for a token.
+     */
+    async acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null> {
+        const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
+
+        const server = http.createServer(function (req, res) {
+            const url = req.url;
+            if (!url) {
+                res.statusCode = 400;
+                res.end();
+                return;
+            }
+            res.statusCode = 200;
+            res.end();
+
+            const urlParts = new URL(url);
+            const code = urlParts.searchParams.get("code");
+            if (code) {
+                const clientInfo = urlParts.searchParams.get("client_info");
+                const tokenRequest: AuthorizationCodeRequest = {
+                    code: code,
+                    scopes: ["user.read"],
+                    redirectUri: "http://localhost:3000/redirect",
+                    codeVerifier: verifier,
+                    clientInfo: clientInfo || ""
+                };
+                const authResult = this.acquireTokenByCode(tokenRequest);
+            }
+            endNavigation();
+        });
+        server.listen(0);
+        const port: number = await new Promise((resolve, reject) => {
+            const id = setInterval(() => {
+                const address = server.address();
+                if (typeof address === "string") {
+                    clearInterval(id);
+                    reject("Wrong type");
+                } else if (address && address.port) {
+                    clearInterval(id);
+                    resolve(address.port);
+                }
+            }, 100);
+        });
+        const validRequest: AuthorizationUrlRequest = {
+            ...request,
+            redirectUri: `http://localhost:${port}`,
+            codeChallenge: challenge, 
+            codeChallengeMethod: "S256"
+        };
+        const authCodeUrl = await this.getAuthCodeUrl(validRequest);
+        await startNavigation(authCodeUrl);
+        return null;
     }
 
     /**
