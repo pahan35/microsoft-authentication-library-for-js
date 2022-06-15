@@ -77,10 +77,14 @@ app.get('/', (req: RequestWithPKCE, res) => {
     };
 
     // Get url to sign user in and consent to scopes needed for application
-    const navigate = async (url: string): Promise<void> => {
+    const startNavigation = async (url: string): Promise<void> => {
         open(url);
     };
-    pca.acquireTokenInteractive(authCodeUrlParameters, navigate).catch((error) => console.log(JSON.stringify(error)));
+
+    const endNavigation = async (): Promise<void> => {
+        // do nothing
+    }
+    pca.acquireTokenInteractive(authCodeUrlParameters, startNavigation, endNavigation).catch((error) => console.log(JSON.stringify(error)));
 });
 
 app.get('/redirect', (req: RequestWithPKCE, res) => {

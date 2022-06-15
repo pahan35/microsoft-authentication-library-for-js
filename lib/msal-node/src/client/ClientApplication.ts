@@ -31,7 +31,6 @@ import {
     AuthorizationCodePayload,
     StringUtils,
     Constants,
-    UrlString,
 } from "@azure/msal-common";
 import { Configuration, buildAppConfiguration, NodeConfiguration } from "../config/Configuration";
 import { CryptoProvider } from "../crypto/CryptoProvider";
@@ -168,53 +167,60 @@ export abstract class ClientApplication {
     async acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null> {
         const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
 
-        const server = http.createServer(function (req, res) {
-            const url = req.url;
-            if (!url) {
-                res.statusCode = 400;
-                res.end();
-                return;
-            }
-            res.statusCode = 200;
-            res.end();
+        const aTBC = this.acquireTokenByCode;
 
-            const urlParts = new URL(url);
-            const code = urlParts.searchParams.get("code");
-            if (code) {
-                const clientInfo = urlParts.searchParams.get("client_info");
-                const tokenRequest: AuthorizationCodeRequest = {
-                    code: code,
-                    scopes: ["user.read"],
-                    redirectUri: "http://localhost:3000/redirect",
-                    codeVerifier: verifier,
-                    clientInfo: clientInfo || ""
-                };
-                const authResult = this.acquireTokenByCode(tokenRequest);
-            }
-            endNavigation();
-        });
-        server.listen(0);
-        const port: number = await new Promise((resolve, reject) => {
-            const id = setInterval(() => {
-                const address = server.address();
-                if (typeof address === "string") {
-                    clearInterval(id);
-                    reject("Wrong type");
-                } else if (address && address.port) {
-                    clearInterval(id);
-                    resolve(address.port);
+        return new Promise(async (resolve, reject) => {
+            const server = http.createServer(function (req, res) {
+                const url = req.url;
+                if (!url) {
+                    res.statusCode = 400;
+                    res.end();
+                    return;
                 }
-            }, 100);
+                res.statusCode = 200;
+                res.end();
+    
+                const urlParts = new URL(url);
+                const code = urlParts.searchParams.get("code");
+                if (code) {
+                    const clientInfo = urlParts.searchParams.get("client_info");
+                    const tokenRequest: AuthorizationCodeRequest = {
+                        code: code,
+                        scopes: ["user.read"],
+                        redirectUri: "http://localhost:3000/redirect",
+                        codeVerifier: verifier,
+                        clientInfo: clientInfo || ""
+                    };
+                    aTBC(tokenRequest).then(response => {
+                        resolve(response);
+                    }).catch((e) => {
+                        reject(e);
+                    });
+                }
+                endNavigation();
+            });
+            server.listen(0);
+            const port: number = await new Promise((resolvePort) => {
+                const id = setInterval(() => {
+                    const address = server.address();
+                    if (typeof address === "string") {
+                        clearInterval(id);
+                        reject("Wrong type");
+                    } else if (address && address.port) {
+                        clearInterval(id);
+                        resolvePort(address.port);
+                    }
+                }, 100);
+            });
+            const validRequest: AuthorizationUrlRequest = {
+                ...request,
+                redirectUri: `http://localhost:${port}`,
+                codeChallenge: challenge, 
+                codeChallengeMethod: "S256"
+            };
+            const authCodeUrl = await this.getAuthCodeUrl(validRequest);
+            await startNavigation(authCodeUrl);
         });
-        const validRequest: AuthorizationUrlRequest = {
-            ...request,
-            redirectUri: `http://localhost:${port}`,
-            codeChallenge: challenge, 
-            codeChallengeMethod: "S256"
-        };
-        const authCodeUrl = await this.getAuthCodeUrl(validRequest);
-        await startNavigation(authCodeUrl);
-        return null;
     }
 
     /**
