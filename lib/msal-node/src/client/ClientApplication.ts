@@ -215,6 +215,7 @@ export abstract class ClientApplication {
             const validRequest: AuthorizationUrlRequest = {
                 ...request,
                 redirectUri: `http://localhost:${port}`,
+                responseMode: ResponseMode.QUERY,
                 codeChallenge: challenge, 
                 codeChallengeMethod: "S256"
             };
