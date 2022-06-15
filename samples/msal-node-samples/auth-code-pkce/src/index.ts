@@ -54,4 +54,15 @@ const startNavigation = async (url: string): Promise<void> => {
 const endNavigation = async (): Promise<void> => {
     // do nothing
 }
-pca.acquireTokenInteractive(authCodeUrlParameters, startNavigation, endNavigation).catch((error) => console.log(JSON.stringify(error)));
+pca.acquireTokenInteractive(authCodeUrlParameters, startNavigation, endNavigation)
+    .then((response => {
+        console.log("SUCCESS!");
+        console.log(response);
+    }))
+    .catch((error) => {
+        console.log("FAILED");
+        console.log(error);
+    })
+    .finally(() => {
+        process.exit(0);
+    });

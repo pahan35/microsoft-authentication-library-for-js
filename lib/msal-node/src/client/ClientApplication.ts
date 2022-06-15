@@ -31,6 +31,7 @@ import {
     AuthorizationCodePayload,
     StringUtils,
     Constants,
+    UrlString,
 } from "@azure/msal-common";
 import { Configuration, buildAppConfiguration, NodeConfiguration } from "../config/Configuration";
 import { CryptoProvider } from "../crypto/CryptoProvider";
@@ -44,7 +45,7 @@ import { RefreshTokenRequest } from "../request/RefreshTokenRequest";
 import { SilentFlowRequest } from "../request/SilentFlowRequest";
 import { version, name } from "../packageMetadata";
 import { UsernamePasswordRequest } from "../request/UsernamePasswordRequest";
-import * as http from "http";
+import { createServer, IncomingMessage, ServerResponse } from "http";
 
 /**
  * Base abstract class for all ClientApplications - public and confidential
@@ -167,10 +168,8 @@ export abstract class ClientApplication {
     async acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null> {
         const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
 
-        const aTBC = this.acquireTokenByCode;
-
         return new Promise(async (resolve, reject) => {
-            const server = http.createServer(function (req, res) {
+            const server = createServer((req: IncomingMessage, res: ServerResponse) => {
                 const url = req.url;
                 if (!url) {
                     res.statusCode = 400;
@@ -180,10 +179,10 @@ export abstract class ClientApplication {
                 res.statusCode = 200;
                 res.end();
     
-                const urlParts = new URL(url);
-                const code = urlParts.searchParams.get("code");
+                const authCodeResponse = UrlString.getDeserializedQueryString(url);
+                const code = authCodeResponse.code;
                 if (code) {
-                    const clientInfo = urlParts.searchParams.get("client_info");
+                    const clientInfo = authCodeResponse.client_info;
                     const tokenRequest: AuthorizationCodeRequest = {
                         code: code,
                         scopes: ["user.read"],
@@ -191,7 +190,7 @@ export abstract class ClientApplication {
                         codeVerifier: verifier,
                         clientInfo: clientInfo || ""
                     };
-                    aTBC(tokenRequest).then(response => {
+                    this.acquireTokenByCode(tokenRequest).then(response => {
                         resolve(response);
                     }).catch((e) => {
                         reject(e);
