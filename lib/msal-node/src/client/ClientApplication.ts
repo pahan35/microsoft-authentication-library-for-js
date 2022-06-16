@@ -168,16 +168,23 @@ export abstract class ClientApplication {
     async acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null> {
         const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
 
+        const validRequest: AuthorizationUrlRequest = {
+            ...request,
+            responseMode: ResponseMode.QUERY,
+            codeChallenge: challenge, 
+            codeChallengeMethod: "S256"
+        };
+
         return new Promise(async (resolve, reject) => {
             const server = createServer((req: IncomingMessage, res: ServerResponse) => {
                 const url = req.url;
                 if (!url) {
-                    res.statusCode = 400;
-                    res.end();
+                    res.writeHead(400, {"Content-Type": "text/html"});
+                    res.end("<script>if (window.location.search) {window.location.replace(window.location.origin);} else { window.close(); }</script>");
                     return;
                 }
-                res.statusCode = 200;
-                res.end();
+                res.writeHead(200, {"Content-Type": "text/html"});
+                res.end("<script>if (window.location.search) {window.location.replace(window.location.origin);} else { window.close(); }</script>");
     
                 const authCodeResponse = UrlString.getDeserializedQueryString(url);
                 const code = authCodeResponse.code;
@@ -186,7 +193,7 @@ export abstract class ClientApplication {
                     const tokenRequest: AuthorizationCodeRequest = {
                         code: code,
                         scopes: ["user.read"],
-                        redirectUri: "http://localhost:3000/redirect",
+                        redirectUri: validRequest.redirectUri,
                         codeVerifier: verifier,
                         clientInfo: clientInfo || ""
                     };
@@ -211,13 +218,9 @@ export abstract class ClientApplication {
                     }
                 }, 100);
             });
-            const validRequest: AuthorizationUrlRequest = {
-                ...request,
-                redirectUri: `http://localhost:${port}`,
-                responseMode: ResponseMode.QUERY,
-                codeChallenge: challenge, 
-                codeChallengeMethod: "S256"
-            };
+
+            validRequest.redirectUri = `http://localhost:${port}`;
+            
             const authCodeUrl = await this.getAuthCodeUrl(validRequest);
             await startNavigation(authCodeUrl);
         });
