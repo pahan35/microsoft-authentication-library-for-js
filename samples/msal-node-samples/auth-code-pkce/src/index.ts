@@ -47,14 +47,11 @@ const authCodeUrlParameters: AuthorizationUrlRequest = {
 };
 
 // Get url to sign user in and consent to scopes needed for application
-const startNavigation = async (url: string): Promise<void> => {
+const openBrowser = async (url: string): Promise<void> => {
     open(url);
 };
 
-const endNavigation = async (): Promise<void> => {
-    // do nothing
-}
-pca.acquireTokenInteractive(authCodeUrlParameters, startNavigation, endNavigation)
+pca.acquireTokenInteractive(authCodeUrlParameters, openBrowser)
     .then((response => {
         console.log("SUCCESS!");
         console.log(response);

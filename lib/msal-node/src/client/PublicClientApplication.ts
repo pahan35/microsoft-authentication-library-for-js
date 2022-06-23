@@ -8,12 +8,17 @@ import {
     DeviceCodeClient,
     AuthenticationResult,
     CommonDeviceCodeRequest,
-    AuthError
+    AuthError,
+    ResponseMode,
+    UrlString
 } from "@azure/msal-common";
 import { Configuration } from "../config/Configuration";
 import { ClientApplication } from "./ClientApplication";
 import { IPublicClientApplication } from "./IPublicClientApplication";
 import { DeviceCodeRequest } from "../request/DeviceCodeRequest";
+import { AuthorizationUrlRequest } from "../request/AuthorizationUrlRequest";
+import { createServer, IncomingMessage, ServerResponse } from "http";
+import { AuthorizationCodeRequest } from "../request/AuthorizationCodeRequest";
 
 /**
  * This class is to be used to acquire tokens for public client applications (desktop, mobile). Public client applications
@@ -73,5 +78,79 @@ export class PublicClientApplication extends ClientApplication implements IPubli
             serverTelemetryManager.cacheFailedRequest(e);
             throw e;
         }
+    }
+
+    /**
+     * Acquires a token by requesting an Authorization code then exchanging it for a token.
+     */
+     async acquireTokenInteractive(request: AuthorizationUrlRequest, openBrowser: (url: string) => Promise<void>, successTemplate?: string, errorTemplate?: string): Promise<AuthenticationResult | null> {
+        const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
+
+        const validRequest: AuthorizationUrlRequest = {
+            ...request,
+            responseMode: ResponseMode.QUERY,
+            codeChallenge: challenge, 
+            codeChallengeMethod: "S256"
+        };
+
+        return new Promise(async (resolve, reject) => {
+            const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+                const url = req.url;
+                if (!url) {
+                    res.writeHead(400, {"Content-Type": "text/html"});
+                    res.end(errorTemplate || "Error occurred loading redirectUrl");
+                    return;
+                } else if (url === "/") {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    res.end(successTemplate || "Auth code was successfully acquired. You can close this window now.");
+                    return;
+                }
+    
+                const authCodeResponse = UrlString.getDeserializedQueryString(url);
+                const code = authCodeResponse.code;
+                if (code) {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    res.end("<script>window.location.replace(window.location.origin);</script>");
+
+                    const clientInfo = authCodeResponse.client_info;
+                    const tokenRequest: AuthorizationCodeRequest = {
+                        code: code,
+                        scopes: ["user.read"],
+                        redirectUri: validRequest.redirectUri,
+                        codeVerifier: verifier,
+                        clientInfo: clientInfo || ""
+                    };
+                    this.acquireTokenByCode(tokenRequest).then(response => {
+                        resolve(response);
+                    }).catch((e) => {
+                        reject(e);
+                    });
+                } else if (authCodeResponse.error) {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    res.end(errorTemplate || `Error occurred: ${authCodeResponse.error}`);
+                } else {
+                    res.writeHead(200, {"Content-Type": "text/html"});
+                    res.end(errorTemplate || "Unknown error occurred");
+                }
+            });
+            server.listen(0);
+            const port: number = await new Promise((resolvePort) => {
+                const id = setInterval(() => {
+                    const address = server.address();
+                    if (typeof address === "string") {
+                        clearInterval(id);
+                        reject("Wrong type");
+                    } else if (address && address.port) {
+                        clearInterval(id);
+                        resolvePort(address.port);
+                    }
+                }, 100);
+            });
+
+            validRequest.redirectUri = `http://localhost:${port}`;
+            
+            const authCodeUrl = await this.getAuthCodeUrl(validRequest);
+            await openBrowser(authCodeUrl);
+        });
     }
 }

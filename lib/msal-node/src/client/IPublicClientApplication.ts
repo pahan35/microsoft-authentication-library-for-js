@@ -25,7 +25,7 @@ export interface IPublicClientApplication {
     acquireTokenByCode(request: AuthorizationCodeRequest): Promise<AuthenticationResult | null>;
 
     /** Acquires a token interactively */
-    acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null>;
+    acquireTokenInteractive(request: AuthorizationUrlRequest, openBrowser: (url: string) => Promise<void>, successTemplate?: string, errorTemplate?: string): Promise<AuthenticationResult | null>;
 
     /** Acquires a token silently when a user specifies the account the token is requested for */
     acquireTokenSilent(request: SilentFlowRequest): Promise<AuthenticationResult | null>;

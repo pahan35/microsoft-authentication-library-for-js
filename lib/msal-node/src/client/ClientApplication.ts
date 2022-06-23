@@ -30,8 +30,7 @@ import {
     AzureCloudOptions,
     AuthorizationCodePayload,
     StringUtils,
-    Constants,
-    UrlString,
+    Constants
 } from "@azure/msal-common";
 import { Configuration, buildAppConfiguration, NodeConfiguration } from "../config/Configuration";
 import { CryptoProvider } from "../crypto/CryptoProvider";
@@ -45,7 +44,6 @@ import { RefreshTokenRequest } from "../request/RefreshTokenRequest";
 import { SilentFlowRequest } from "../request/SilentFlowRequest";
 import { version, name } from "../packageMetadata";
 import { UsernamePasswordRequest } from "../request/UsernamePasswordRequest";
-import { createServer, IncomingMessage, ServerResponse } from "http";
 
 /**
  * Base abstract class for all ClientApplications - public and confidential
@@ -53,7 +51,7 @@ import { createServer, IncomingMessage, ServerResponse } from "http";
  */
 export abstract class ClientApplication {
 
-    private readonly cryptoProvider: CryptoProvider;
+    protected readonly cryptoProvider: CryptoProvider;
     private tokenCache: TokenCache;
 
     /**
@@ -160,70 +158,6 @@ export abstract class ClientApplication {
             serverTelemetryManager.cacheFailedRequest(e);
             throw e;
         }
-    }
-
-    /**
-     * Acquires a token by requesting an Authorization code then exchanging it for a token.
-     */
-    async acquireTokenInteractive(request: AuthorizationUrlRequest, startNavigation: (url: string) => Promise<void>, endNavigation: () => Promise<void>): Promise<AuthenticationResult | null> {
-        const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
-
-        const validRequest: AuthorizationUrlRequest = {
-            ...request,
-            responseMode: ResponseMode.QUERY,
-            codeChallenge: challenge, 
-            codeChallengeMethod: "S256"
-        };
-
-        return new Promise(async (resolve, reject) => {
-            const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-                const url = req.url;
-                if (!url) {
-                    res.writeHead(400, {"Content-Type": "text/html"});
-                    res.end("<script>if (window.location.search) {window.location.replace(window.location.origin);} else { window.close(); }</script>");
-                    return;
-                }
-                res.writeHead(200, {"Content-Type": "text/html"});
-                res.end("<script>if (window.location.search) {window.location.replace(window.location.origin);} else { window.close(); }</script>");
-    
-                const authCodeResponse = UrlString.getDeserializedQueryString(url);
-                const code = authCodeResponse.code;
-                if (code) {
-                    const clientInfo = authCodeResponse.client_info;
-                    const tokenRequest: AuthorizationCodeRequest = {
-                        code: code,
-                        scopes: ["user.read"],
-                        redirectUri: validRequest.redirectUri,
-                        codeVerifier: verifier,
-                        clientInfo: clientInfo || ""
-                    };
-                    this.acquireTokenByCode(tokenRequest).then(response => {
-                        resolve(response);
-                    }).catch((e) => {
-                        reject(e);
-                    });
-                }
-                endNavigation();
-            });
-            server.listen(0);
-            const port: number = await new Promise((resolvePort) => {
-                const id = setInterval(() => {
-                    const address = server.address();
-                    if (typeof address === "string") {
-                        clearInterval(id);
-                        reject("Wrong type");
-                    } else if (address && address.port) {
-                        clearInterval(id);
-                        resolvePort(address.port);
-                    }
-                }, 100);
-            });
-
-            validRequest.redirectUri = `http://localhost:${port}`;
-            
-            const authCodeUrl = await this.getAuthCodeUrl(validRequest);
-            await startNavigation(authCodeUrl);
-        });
     }
 
     /**
