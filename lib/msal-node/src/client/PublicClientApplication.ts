@@ -83,7 +83,7 @@ export class PublicClientApplication extends ClientApplication implements IPubli
     /**
      * Acquires a token by requesting an Authorization code then exchanging it for a token.
      */
-     async acquireTokenInteractive(request: AuthorizationUrlRequest, openBrowser: (url: string) => Promise<void>, successTemplate?: string, errorTemplate?: string): Promise<AuthenticationResult | null> {
+    async acquireTokenInteractive(request: AuthorizationUrlRequest, openBrowser: (url: string) => Promise<void>, successTemplate?: string, errorTemplate?: string): Promise<AuthenticationResult> {
         const { verifier, challenge } = await this.cryptoProvider.generatePkceCodes();
 
         const validRequest: AuthorizationUrlRequest = {

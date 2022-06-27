@@ -51,7 +51,9 @@ const openBrowser = async (url: string): Promise<void> => {
     open(url);
 };
 
-pca.acquireTokenInteractive(authCodeUrlParameters, openBrowser)
+const successTemplate = "Successfully signed in! You can close this window now.";
+
+pca.acquireTokenInteractive(authCodeUrlParameters, openBrowser, successTemplate)
     .then((response => {
         console.log("SUCCESS!");
         console.log(response);
