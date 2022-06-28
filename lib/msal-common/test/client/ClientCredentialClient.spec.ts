@@ -368,8 +368,8 @@ describe("ClientCredentialClient unit tests", () => {
         const accessToken = "some_token";
         const appTokenProviderResult: AppTokenProviderResult = {
             accessToken: accessToken,
-            expiresInSeconds: 3601,
-            refreshInSeconds: 1801,
+            expiresInSeconds: 1800,
+            refreshInSeconds: 900,
         }
 
         const expectedScopes = [TEST_CONFIG.DEFAULT_GRAPH_SCOPE[0]];
@@ -406,8 +406,8 @@ describe("ClientCredentialClient unit tests", () => {
         expect(authResult.accessToken).toEqual(accessToken);
         expect(authResult.state).toHaveLength(0);
         const dateDiff = (authResult.expiresOn!.valueOf() - Date.now().valueOf()) / 1000;
-        expect(dateDiff).toBeLessThanOrEqual(3601);
-        expect(dateDiff).toBeGreaterThan(3400);
+        expect(dateDiff).toBeLessThanOrEqual(1900);
+        expect(dateDiff).toBeGreaterThan(1700);
 
         const authResult2 = await client.acquireToken(clientCredentialRequest) as AuthenticationResult;
 
