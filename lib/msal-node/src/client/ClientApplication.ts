@@ -30,8 +30,7 @@ import {
     AzureCloudOptions,
     AuthorizationCodePayload,
     StringUtils,
-    Constants,
-} from "@azure/msal-common";
+    Constants} from "@azure/msal-common";
 import { Configuration, buildAppConfiguration, NodeConfiguration } from "../config/Configuration";
 import { CryptoProvider } from "../crypto/CryptoProvider";
 import { NodeStorage } from "../cache/NodeStorage";
