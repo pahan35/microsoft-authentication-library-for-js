@@ -87,7 +87,11 @@ export {
     OIDC_DEFAULT_SCOPES,
     PerformanceCallbackFunction, 
     PerformanceEvent, 
-    PerformanceEvents
+    PerformanceEvents,
+    // IAppTokenProvider
+    IAppTokenProvider,
+    AppTokenProviderParameters,
+    AppTokenProviderResult
 } from "@azure/msal-common";
 
 export { version } from "./packageMetadata";
