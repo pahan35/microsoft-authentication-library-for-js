@@ -1,6 +1,6 @@
 {
   "type": "minor",
-  "comment": "Add extensiblity point AppTokenCacheProvider",
+  "comment": "Add extensiblity point AppTokenCacheProvider #4936",
   "packageName": "@azure/msal-node",
   "email": "bogavril@microsoft.com",
   "dependentChangeType": "patch"
